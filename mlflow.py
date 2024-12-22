@@ -1,3 +1,48 @@
+from mlflow.models.signature import ModelSignature
+from mlflow.types.schema import Schema, ColSpec
+from mlflow.tracking import MlflowClient
+import mlflow
+
+# Define the input schema
+# CHANGE THESE COLUMN NAMES AND DATA TYPES ACCORDINGLY
+input_schema = Schema([
+    ColSpec('long', "STORE_ID"),
+    ColSpec('double', "SCHEDULED_LABOR"),
+    ColSpec('long', "WEEK_ID"),
+    ColSpec('long', "DAYOFWEEK"),
+    ColSpec('long', "HOUR"),
+    ColSpec('long', "MIN")
+])
+
+# Define the output schema
+output_schema = Schema([
+    ColSpec("double")
+])
+
+# Create the model signature
+signature = ModelSignature(inputs=input_schema, outputs=output_schema)
+
+model_version = 1
+# Instead of model_version, you can also use model_stage as 'Production'
+workspace_registry_uri = f'models://{scope}:{prefix}@databricks/{model_name}/{model_stage}'
+loaded_model = mlflow.pyfunc.load_model(workspace_registry_uri)
+inst=loaded_model.unwrap_python_model()
+
+
+parent_run_id = None
+with mlflow.start_run() as parent_run:
+        # CHANGE THIS to your model falvor 
+    mlflow.pyfunc.log_model(artifact_path = "model",python_model=inst,signature=signature)
+    
+    parent_run_id = parent_run.info.run_id
+
+#2
+mlflow.set_registry_uri("databricks-uc")
+##PARENT RUN ID from ABOVE
+mlflow.register_model(model_uri=f"runs:/{parent_run_id}/model",
+                      name=f"feature_store.default.{model_name}_ws"
+                      )
+
 # Databricks notebook source
 from pyspark.ml.regression import LinearRegression
 from pyspark.ml.feature import VectorAssembler
